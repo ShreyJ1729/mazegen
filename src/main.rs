@@ -1,94 +1,113 @@
+use std::{mem::size_of_val, path};
+
+use clap::Parser;
+use maze::*;
 use rand::Rng;
 
+mod maze;
 // todo
-// 1. add command line arguments for width and height
-// 2. add command line argument for path compression
-// 3. add command line argument for showing solution
+// add seedable rng and time=seed
 // 4. code cleanup
-// 5. add doc comments
 // 6. finish readme
+// 7. under some threshold (ratio of total cells to disjoint sets), start only knocking down walls that connect disjoint sets (do this by only picking -1s)
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// width
+    #[arg(short, long, default_value_t = 10)]
+    columns: usize,
+
+    /// height
+    #[arg(short, long, default_value_t = 10)]
+    rows: usize,
+
+    /// path compression
+    #[arg(short, long, default_value_t = false)]
+    path_compression: bool,
+}
 
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
-
-    const DEFAULT_WIDTH: usize = 100;
-    const DEFAULT_HEIGHT: usize = 100;
-
     const DIRECTIONS: [(isize, isize); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
 
     // width/height in cells
-    let width: usize = args[1].parse().unwrap_or(DEFAULT_WIDTH);
-    let height: usize = args[2].parse().unwrap_or(DEFAULT_HEIGHT);
+    let args = Args::parse();
+    let width = args.columns;
+    let height = args.rows;
+    let path_compression = args.path_compression;
 
-    // cells, horizontal walls, vertical walls
-    let mut cells = vec![0isize; width * height];
-    let mut hwalls = vec![vec![true; width]; height - 1];
-    let mut vwalls = vec![vec![true; width - 1]; height];
+    println!("Building {}x{} maze...", width, height);
 
-    // start is topleft, end is bottomright
-    vwalls[0][0] = false;
-    vwalls[height - 1][width - 2] = false;
+    let maze = Maze::new(width, height, path_compression);
+    maze.print(true);
 
-    let mut rng = rand::thread_rng();
+    // // cells, horizontal walls, vertical walls
+    // let mut cells = vec![-1isize; width * height];
+    // let mut hwalls = vec![vec![true; width]; height - 1];
+    // let mut vwalls = vec![vec![true; width - 1]; height];
 
-    // fill cells with -1 (all cells disjoint)
-    cells.fill(-1);
+    // // start is topleft, end is bottomright
+    // vwalls[0][0] = false;
+    // vwalls[height - 1][width - 2] = false;
 
-    // while there are disjoint cells, pick a random cell and knock down a random wall
-    while cells.iter().filter(|&cell| *cell < 0).count() > 1 {
-        // pick a random cell
-        let cell1 = rng.gen_range(0..width * height);
-        let (col, row) = (cell1 % width, cell1 / width);
+    // let mut rng = rand::thread_rng();
 
-        // pick a random direction
-        let direction = rng.gen_range(0..4);
-        let (dcol, drow) = DIRECTIONS[direction];
+    // // while there are disjoint cells, pick a random cell and knock down a random wall
+    // while cells.iter().filter(|&cell| *cell < 0).count() > 1 {
+    //     // pick a random cell
+    //     let cell1 = rng.gen_range(0..width * height);
+    //     let (col, row) = (cell1 % width, cell1 / width);
 
-        // if out of bounds, pick another cell
-        if col as isize + dcol < 0
-            || col as isize + dcol >= width as isize
-            || row as isize + drow < 0
-            || row as isize + drow >= height as isize
-        {
-            continue;
-        }
+    //     // pick a random direction
+    //     let direction = rng.gen_range(0..4);
+    //     let (dcol, drow) = DIRECTIONS[direction];
 
-        // calculate the adjacent cell
-        let cell2 = ((row as isize + drow) * width as isize + (col as isize + dcol)) as usize;
+    //     // if out of bounds, pick another cell
+    //     if col as isize + dcol < 0
+    //         || col as isize + dcol >= width as isize
+    //         || row as isize + drow < 0
+    //         || row as isize + drow >= height as isize
+    //     {
+    //         continue;
+    //     }
 
-        // find roots of the disjoint sets
-        let cell1_root = find(&mut cells, cell1);
-        let cell2_root = find(&mut cells, cell2);
+    //     // calculate the adjacent cell
+    //     let cell2 = ((row as isize + drow) * width as isize + (col as isize + dcol)) as usize;
 
-        // if the roots are the same, the cells are already connected
-        if cell1_root == cell2_root {
-            continue;
-        }
+    //     // find roots of the disjoint sets
+    //     let cell1_root = find(&mut cells, cell1, path_compression);
+    //     let cell2_root = find(&mut cells, cell2, path_compression);
 
-        // otherwise connect
-        // 1. union the disjoint sets
-        union(&mut cells, cell1_root, cell2_root);
+    //     // if the roots are the same, the cells are already connected
+    //     if cell1_root == cell2_root {
+    //         continue;
+    //     }
 
-        // 2. knock down the walls
-        if dcol == -1 {
-            vwalls[row][col - 1] = false;
-        } else if dcol == 1 {
-            vwalls[row][col] = false;
-        } else if drow == -1 {
-            hwalls[row - 1][col] = false;
-        } else if drow == 1 {
-            hwalls[row][col] = false;
-        } else {
-            panic!("invalid direction");
-        }
-    }
+    //     // otherwise connect
+    //     // 1. union the disjoint sets
+    //     union(&mut cells, cell1_root, cell2_root);
 
-    print_maze(&hwalls, &vwalls);
+    //     // 2. knock down the walls
+    //     if dcol == -1 {
+    //         vwalls[row][col - 1] = false;
+    //     } else if dcol == 1 {
+    //         vwalls[row][col] = false;
+    //     } else if drow == -1 {
+    //         hwalls[row - 1][col] = false;
+    //     } else if drow == 1 {
+    //         hwalls[row][col] = false;
+    //     } else {
+    //         panic!("invalid direction");
+    //     }
+    // }
 
-    println!("{} {}", width, height);
-    println!("{:?}", cells);
+    // print_maze(&hwalls, &vwalls);
 }
 
+/// Prints the maze
+/// ### Arguments
+/// * `hwalls` - the horizontal walls (ignoring the top and bottom borders)
+/// * `vwalls` - the vertical walls (ignoring the left and right borders)
 fn print_maze(hwalls: &[Vec<bool>], vwalls: &[Vec<bool>]) {
     // print the top border
     print!("+");
@@ -138,6 +157,11 @@ fn print_maze(hwalls: &[Vec<bool>], vwalls: &[Vec<bool>]) {
     println!();
 }
 
+/// Unions two disjoint sets using union-by-size
+/// ### Arguments
+/// * `cells` - the disjoint set
+/// * `cell1` - the first cell to union
+/// * `cell2` - the second cell to union
 fn union(cells: &mut [isize], cell1: usize, cell2: usize) {
     if cells[cell1] < cells[cell2] {
         cells[cell1] += cells[cell2];
@@ -148,18 +172,28 @@ fn union(cells: &mut [isize], cell1: usize, cell2: usize) {
     }
 }
 
-fn find(cells: &mut [isize], mut cell: usize) -> usize {
+/// Finds the root of the disjoint set, optionally compressing the path
+/// ### Arguments
+/// * `cells` - the disjoint set
+/// * `target` - the cell to find the root of
+/// * `path_compression` - whether to compress the path
+///
+/// ### Returns
+/// * the root of the disjoint set containing `target` as a usize (index of the root in `cells`)
+fn find(cells: &mut [isize], mut target: usize, path_compression: bool) -> usize {
     // find the root of the disjoint set
-    let mut root = cell;
+    let mut root = target;
     while cells[root] >= 0 {
         root = cells[root] as usize;
     }
 
     // path compression
-    while cells[cell] >= 0 {
-        let parent = cells[cell] as usize;
-        cells[cell] = root as isize;
-        cell = parent;
+    if path_compression {
+        while cells[target] >= 0 {
+            let parent = cells[target] as usize;
+            cells[target] = root as isize;
+            target = parent;
+        }
     }
 
     root
