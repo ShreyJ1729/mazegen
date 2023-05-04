@@ -1,6 +1,4 @@
-use std::collections::HashSet;
-
-use rand::Rng;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 
 pub struct Maze {
     width: usize,
@@ -9,15 +7,24 @@ pub struct Maze {
     vwalls: Vec<Vec<bool>>,
     cells: Vec<isize>,
     path_compression: bool,
-    solution: HashSet<usize>,
-    rng: rand::rngs::ThreadRng,
+    rng: StdRng,
 }
 
 // (dcol, drow) - up, down, left, right
 const DIRECTIONS: [(isize, isize); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
 
 impl Maze {
-    pub fn new(width: usize, height: usize, path_compression: bool) -> Self {
+    pub fn new(
+        width: usize,
+        height: usize,
+        path_compression: bool,
+        show_progress_bar: bool,
+    ) -> Self {
+        assert!(
+            width > 1 && height > 1,
+            "Width and height must be at least 2"
+        );
+
         // all of the HxW cells are initially in their own disjoint sets
         let cells = vec![-1; width * height];
 
@@ -31,8 +38,8 @@ impl Maze {
         vwalls[0][0] = false;
         vwalls[height - 1][width - 2] = false;
 
-        // init rng
-        let rng = rand::thread_rng();
+        // get curr time in nanos to seed rng
+        let currtime = std::time::UNIX_EPOCH.elapsed().unwrap().as_nanos() as u64;
 
         // init and build maze
         let mut maze = Self {
@@ -42,20 +49,24 @@ impl Maze {
             hwalls,
             vwalls,
             path_compression,
-            solution: HashSet::new(),
-            rng,
+            rng: StdRng::seed_from_u64(currtime),
         };
-        maze.build();
+        maze.build(show_progress_bar);
         maze
     }
 
     /// Builds the maze
     /// ### Arguments
-    pub fn build(&mut self) {
+    pub fn build(&mut self, show_progress_bar: bool) {
         while !self.is_maze_connected() {
             // 0. Some logging
-            print!("Resolving disjoint sets...");
-            print!("{} remaining\r", self.num_disjoint_sets());
+            if show_progress_bar {
+                print!(
+                    "Resolving disjoint sets for {}x{} maze...",
+                    self.width, self.height
+                );
+                print!("{} remaining\r", self.num_disjoint_sets());
+            }
 
             // 1. pick a random cell
             let (row, col) = self.get_random_cell();
@@ -104,25 +115,10 @@ impl Maze {
                 _ => unreachable!("Invalid direction"),
             }
         }
-
-        // if path compression is off, compute the solution
-        if !self.path_compression {
-            self.compute_solution();
-            println!("cells: {:?}", self.cells);
-            println!("Solution: {:?}", self.solution)
+        if show_progress_bar {
+            // clear progress bar
+            println!("{}\r", " ".repeat(100));
         }
-    }
-
-    fn compute_solution(&mut self) {
-        assert_eq!(self.path_compression, false);
-
-        // 1. find path to root for start and end
-        let start_path = self.find_path_to_root(0);
-        let end_path = self.find_path_to_root(self.cells.len() - 1);
-
-        // 2. take union of paths by sticking them in a hashset
-        self.solution.extend(start_path);
-        self.solution.extend(end_path);
     }
 
     /// Returns the (row, col) for a random cell in the maze
@@ -149,7 +145,6 @@ impl Maze {
     pub fn print(&self) {
         let vwall_rows = self.vwalls.len();
         let vwall_cols = self.vwalls[0].len();
-        let hwall_rows = self.hwalls.len();
         let hwall_cols = self.hwalls[0].len();
 
         // top border
@@ -223,19 +218,5 @@ impl Maze {
         }
 
         root
-    }
-
-    /// Finds the path from the target cell to the root of the disjoint set
-    /// ### Arguments
-    /// * `cells` - (supplied at construction) the disjoint set
-    /// * `target` - the cell to find the path to the root of
-    fn find_path_to_root(&mut self, mut target: usize) -> Vec<usize> {
-        let mut path = vec![target];
-        while self.cells[target] >= 0 {
-            let parent = self.cells[target] as usize;
-            path.push(parent);
-            target = parent;
-        }
-        path
     }
 }

@@ -2,17 +2,46 @@
 
 ### Usage
 
-- maze gen
-  - each cell diff set
-  - randomly pick a cell and wall
-  - if cell not connected to cell on other side of wall, union them
-  - continue until all connected
+```zsh
+$ cargo run --release -- [-r <num rows>] [-c <num cols>] [-p (path compression)] [-s (progress bar)]
+```
+
+or
+
+```zsh
+$ cargo build --release
+$ ./target/release/maze-gen [-r <num rows>] [-c <num cols>] [-p (path compression)] [-s (progress bar)]
+```
+
+For large mazes, make sure to use the `--release` and `-p` flags.
+
+#### Example
+
+```zsh
+$ cargo run --release -- -r 7 -c 20
+
++--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+      |     |     |  |  |  |                    |  |        |
++--+  +  +  +  +--+  +  +  +  +--+  +  +--+  +  +  +--+  +--+
+|  |     |  |  |  |  |     |     |  |     |  |     |  |     |
++  +  +--+  +  +  +  +--+  +  +--+--+  +--+  +  +  +  +  +  +
+|     |  |  |                       |     |  |  |  |     |  |
++  +  +  +--+  +--+--+--+  +--+  +  +--+--+  +--+  +  +--+--+
+|  |           |              |  |        |  |     |        |
++--+  +  +  +  +--+--+--+  +  +  +--+--+  +--+  +--+--+  +  +
+|     |  |  |  |        |  |  |     |  |  |        |     |  |
++--+  +--+--+  +  +  +--+--+--+  +--+  +--+--+  +--+  +--+--+
+|     |        |  |     |           |     |                 |
++  +  +--+  +  +  +--+--+--+--+  +--+  +--+  +--+  +  +--+--+
+|  |  |     |              |              |  |     |
++--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+```
 
 ### Motivation and Theory
 
-Learning about the disjoint set ADT in my algorithms class, I was interested to see it's practical applications, so I built a maze generator using it.
+Learning about the disjoint set ADT in my algorithms class, I was interested to see it's practical applications, so I built a maze generator in Rust.
 
-The disjoint set ADT is used to solve the dynamic equivalence problem, which is the problem of determining if two elements are in the same equivalence class. This is useful for many applications, such as determining if two nodes in a circuit are connected, or if two people are friends on a social network, or in our case, if two cells in a maze are connected.
+The disjoint set ADT is used to solve the dynamic equivalence problem, which is the problem of determining if two elements are in the same equivalence class given implicit data. Applications include determining if two nodes in a circuit are wired, if two people are friends on a social network, or in our case, if two cells in a maze are connected.
 
 #### Equivalence Relations
 
@@ -36,18 +65,18 @@ The equivalence class of an element $a$ (denoted $[a]$) is the set of elements i
 
 #### Dynamic Equivalence (Connectivity)
 
-It's easy to verify if $a~b$ holds true for some $a, b \in S$ in constant time: we simply check $aRb$ for all pairs $(a, b) \in S \times S$ and construct a lookup table (2D boolean array). But what happens if the data we get is implicit in nature? e.g. instead of a circuit diagram of nodes (set $S$) and wires (lookup table), we are given only the set of wires ($a_1~a_2$, $a_3~a_4$, $a_5~a_1$, $a_2~a_4$) and we want to know all the nodes are connected. We can't simply lookup $a_i~a_j$ for all $i, j$ as before.
+It's easy to verify if $a \sim b$ holds true for some $a, b \in S$ in constant time: we simply check $aRb$ for all pairs $(a, b) \in S \times S$ and construct a lookup table (2D boolean array). But what happens if the data we get is implicit in nature? e.g. instead of a circuit diagram of nodes (set $S$) and wires (lookup table), we are given only the set of wires ($a_1 \sim a_2$, $a_3 \sim a_4$, $a_5 \sim a_1$, $a_2 \sim a_4$) and we want to know all the nodes are connected. We can't simply lookup $a_i \sim a_j$ for all $i, j$ as before.
 
-In this example, we can can partition the set of nodes in the circuit as a set of disjoint equivalence classes (unconnected subcircuits). To know if $a~b$, we check if $a$ and $b$ are in the same equivalence class. From this representation, we can solve the dynamic equivalence problem by using the disjoint set ADT.
+In this example, we can can partition the set of nodes in the circuit as a set of disjoint equivalence classes (unconnected subcircuits). To know if $a \sim b$, we check if $a$ and $b$ are in the same equivalence class. From this representation, we can solve the dynamic equivalence problem by using the disjoint set ADT.
 
-#### Disjoint Set ADT
+#### The Disjoint Set ADT
 
 ##### Operations
 
 To solve the above example, we begin with $N$ disjoint sets each of size 1, and perform the following operations:
 
-- find($a$) = returns the name of the set containing element $a$
-- union($A, B$) = merges the sets named $A$ and $B$ into a single set
+- $\text{find}(a)$ = returns the name of the set containing element $a$
+- $\text{union}(A, B)$ = merges the sets named $A$ and $B$ into a single set
 
 The problem of dynamic equivalence can be stated as wanting to know if find(a)\==find(b).
 
@@ -55,7 +84,7 @@ Note that these operations don't actually do any type of relative comparison of 
 
 ##### Implementation
 
-We can implement the disjoint set ADT using a forest (set of trees) represented as a 1D array $s$ of size $N$ where $s[i]$ is the parent of $i$. If $s[i] = -1$, then $i$ is the root of its tree (and $i$ is the name of the tree).
+We can implement the disjoint set ADT using a set of trees represented as a 1D array $s$ of size $N$ where $s[i]$ is the parent of $i$. If $s[i] = -1$, then $i$ is the root of its tree (and $i$ is the name of the tree).
 
 To union, simply make the root of one tree the child of the root of the other tree - this is $O(1)$.
 To find, iteratively follow the parent pointers until you reach the root - this is $O(N)$.
@@ -64,6 +93,6 @@ to improve the running time of union, we can use union-by-size, where we store s
 
 ##### Path Compression
 
-Performing $M$ find operations currently takes $O(M\log{N})$ running time. We can further improve this by using path compression - when we run find on an element, we reassign all nodes on the path to the root as children of the root. This ensures that the depth of the tree is always $\leq \log^* N$, where $\log^* N$ is the iterated logarithm: the number of times log must be applied to $N$ to reach a value $\leq 1$.
+Performing a find operations currently takes $O(\log{N})$ running time. We can further improve this by using path compression - when we run find on an element, we reassign all nodes on the path to the root as children of the root. This ensures that the depth of the tree is always $\leq \log^* N$, where $\log^* N$ is the iterated logarithm: the number of times log must be applied to $N$ to reach a value $\leq 1$.
 
-$\log^* N$ is _extremely_ slow growing, $\left(\log^*{\left(1,000,000^{1,000,000}\right)}=5\right)$ so we can consider it to be a constant. Thus, the running time of $M$ find operations is essentially $O(M)$.
+$\log^* N$ is _extremely_ slow growing, $\left(\log^*{\left(1,000,000^{1,000,000}\right)}=5\right)$ so using path compression the find operation essentially becomes $O(1)$.
