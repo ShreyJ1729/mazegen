@@ -146,7 +146,7 @@ impl Maze {
     /// ### Arguments
     /// * `hwalls` - the horizontal walls (ignoring the top and bottom borders)
     /// * `vwalls` - the vertical walls (ignoring the left and right borders)
-    pub fn print(&self, solution: bool) {
+    pub fn print(&self) {
         let vwall_rows = self.vwalls.len();
         let vwall_cols = self.vwalls[0].len();
         let hwall_rows = self.hwalls.len();
