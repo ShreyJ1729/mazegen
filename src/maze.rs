@@ -157,11 +157,11 @@ impl Maze {
 
             // vertical walls
             for col in 0..vwall_cols {
-                print!("  ");
+                print!("   ");
                 print!("{}", if self.vwalls[row][col] { "|" } else { " " });
             }
             // right border
-            println!("  {}", if row == vwall_rows - 1 { " " } else { "|" });
+            println!("   {}", if row == vwall_rows - 1 { " " } else { "|" });
 
             // skip bottom border
             if row == vwall_rows - 1 {
@@ -171,13 +171,13 @@ impl Maze {
             // horizontal walls
             print!("+");
             for col in 0..hwall_cols {
-                print!("{}+", if self.hwalls[row][col] { "--" } else { "  " });
+                print!("{}+", if self.hwalls[row][col] { "---" } else { "   " });
             }
             println!();
         }
 
         // bottom border
-        print!("{}", "+--".repeat(hwall_cols));
+        print!("{}", "+---".repeat(hwall_cols));
         println!("+");
     }
 
