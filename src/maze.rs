@@ -148,7 +148,7 @@ impl Maze {
         let hwall_cols = self.hwalls[0].len();
 
         // top border
-        println!("{}+", "+--".repeat(hwall_cols));
+        println!("{}+", "+---".repeat(hwall_cols));
 
         // print the maze
         for row in 0..vwall_rows {
